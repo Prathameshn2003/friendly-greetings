@@ -3,6 +3,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+
+
 // ==========================================
 // PCOS PREDICTION ENGINE
 // Based on RF + XGBoost ensemble logic
@@ -569,146 +573,222 @@ export interface MLPredictionMeta {
  * PCOS prediction via real ML API with local fallback
  */
 export async function predictPCOSFromAPI(
-  data: PCOSInputData
+  data: PCOSInputData,
+  userId?: string
 ): Promise<PCOSResult & { _meta: MLPredictionMeta }> {
+
   try {
-    const { data: response, error } = await supabase.functions.invoke("ml-predict", {
-      body: { model_type: "pcos", input_data: data },
+    const response = await fetch(`${API_BASE_URL}/predict/pcos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+
+      // ✅ FIX: convert boolean → number for FastAPI
+      body: JSON.stringify({
+        age: data.age,
+        weight: data.weight,
+        bmi: data.bmi,
+        cycleRegular: data.cycleRegular ? 1 : 0,
+        cycleLength: data.cycleLength,
+        weightGain: data.weightGain ? 1 : 0,
+        hairGrowth: data.hairGrowth ? 1 : 0,
+        skinDarkening: data.skinDarkening ? 1 : 0,
+        hairLoss: data.hairLoss ? 1 : 0,
+        pimples: data.pimples ? 1 : 0,
+        fastFood: data.fastFood ? 1 : 0,
+        regularExercise: data.regularExercise ? 1 : 0,
+        follicleLeft: data.follicleLeft,
+        follicleRight: data.follicleRight,
+        endometrium: data.endometrium,
+      }),
     });
 
-    if (error) throw error;
-
-    if (response?.fallback === false && response?.prediction) {
-      const p = response.prediction;
-      // Map API response to PCOSResult interface
-      const severity: 'none' | 'low' | 'medium' | 'high' =
-        p.severity === 'high' ? 'high' :
-        p.severity === 'medium' ? 'medium' :
-        p.severity === 'low' ? 'low' : 'none';
-
-      const result: PCOSResult = {
-        hasPCOS: p.has_pcos ?? p.hasPCOS ?? false,
-        riskPercentage: p.risk_percentage ?? p.riskPercentage ?? 0,
-        severity,
-        breakdown: p.breakdown ?? {
-          cycleScore: 0,
-          hormonalScore: 0,
-          ultrasoundScore: 0,
-          metabolicScore: 0,
-        },
-        recommendations: p.recommendations ?? getPCOSRecommendationsPublic(severity),
-      };
-
-      return { ...result, _meta: { usedAPI: true } };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Backend error:", errorText);
+      throw new Error("Backend validation failed");
     }
 
-    // Fallback to local
-    console.log("ML API fallback:", response?.error);
+    const result = await response.json();
+
+    const severityMap: any = {
+      Low: "low",
+      Medium: "medium",
+      High: "high",
+      None: "none",
+    };
+
+    const formattedResult: PCOSResult = {
+      hasPCOS: result.hasPCOS,
+      riskPercentage: result.riskPercentage,
+      severity: severityMap[result.severity] ?? "none",
+      breakdown: result.breakdown,
+      recommendations: {
+        diet: result.recommendations.diet,
+        exercise: result.recommendations.exercise,
+        lifestyle: result.recommendations.lifestyle,
+        needsDoctor: result.recommendations.doctor,
+      },
+    };
+
+    if (userId) {
+      await supabase.from("health_assessments").insert({
+        user_id: userId,
+        assessment_type: "pcos",
+        risk_score: formattedResult.riskPercentage,
+        risk_category:
+          formattedResult.severity === "none"
+            ? "low"
+            : formattedResult.severity,
+        responses: data as any,
+        recommendations: formattedResult.recommendations as any,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    return { ...formattedResult, _meta: { usedAPI: true } };
+
+  } catch (error: any) {
+
+    console.log("Using local fallback:", error?.message);
+
     const localResult = predictPCOS(data);
-    return { ...localResult, _meta: { usedAPI: false, error: response?.error } };
-  } catch (err) {
-    console.error("ML API call failed, using local prediction:", err);
-    const localResult = predictPCOS(data);
+
     return {
       ...localResult,
-      _meta: { usedAPI: false, error: err instanceof Error ? err.message : "Unknown error" },
+      _meta: { usedAPI: false, error: error.message },
     };
   }
 }
+
+
+
 
 /**
  * Menopause prediction via real ML API with local fallback
  */
 export async function predictMenopauseFromAPI(
-  data: MenopauseInputData
+  data: MenopauseInputData,
+  userId?: string
 ): Promise<MenopauseResult & { _meta: MLPredictionMeta }> {
+
   try {
-    const { data: response, error } = await supabase.functions.invoke("ml-predict", {
-      body: { model_type: "menopause", input_data: data },
+    const response = await fetch(`${API_BASE_URL}/predict/menopause`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+
+      // ✅ Convert boolean → number (for FastAPI)
+      body: JSON.stringify({
+        age: data.age,
+        estrogen_level: data.estrogenLevel,
+        fsh_level: data.fshLevel,
+        years_since_last_period: data.yearsSinceLastPeriod,
+        irregular_periods: data.irregularPeriods ? 1 : 0,
+        missed_periods: data.missedPeriods ? 1 : 0,
+        hot_flashes: data.hotFlashes ? 1 : 0,
+        night_sweats: data.nightSweats ? 1 : 0,
+        sleep_problems: data.sleepProblems ? 1 : 0,
+        vaginal_dryness: data.vaginalDryness ? 1 : 0,
+        joint_pain: data.jointPain ? 1 : 0,
+      }),
     });
 
-    if (error) throw error;
-
-    if (response?.fallback === false && response?.prediction) {
-      const p = response.prediction;
-      const stage: MenopauseResult['stage'] =
-        p.stage === 'Post-Menopause' ? 'Post-Menopause' :
-        p.stage === 'Peri-Menopause' ? 'Peri-Menopause' : 'Pre-Menopause';
-
-      const result: MenopauseResult = {
-        stage,
-        riskPercentage: p.risk_percentage ?? p.riskPercentage ?? 0,
-        hasMenopauseSymptoms: stage !== 'Pre-Menopause',
-        breakdown: p.breakdown ?? {
-          ageScore: 0,
-          hormoneScore: 0,
-          symptomScore: 0,
-          periodScore: 0,
-        },
-        recommendations: p.recommendations ?? getMenopauseRecommendationsPublic(stage),
-      };
-
-      return { ...result, _meta: { usedAPI: true } };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Backend error:", errorText);
+      throw new Error("Backend validation failed");
     }
 
-    console.log("ML API fallback:", response?.error);
+    const result = await response.json();
+
+    if (userId) {
+      await supabase.from("health_assessments").insert({
+        user_id: userId,
+        assessment_type: "menopause",
+        risk_score: result.riskPercentage,
+        risk_category:
+          result.riskPercentage < 40
+            ? "low"
+            : result.riskPercentage < 70
+            ? "medium"
+            : "high",
+        responses: data as any,
+        recommendations: result.recommendations as any,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    return { ...result, _meta: { usedAPI: true } };
+
+  } catch (error: any) {
+
     const localResult = predictMenopause(data);
-    return { ...localResult, _meta: { usedAPI: false, error: response?.error } };
-  } catch (err) {
-    console.error("ML API call failed, using local prediction:", err);
-    const localResult = predictMenopause(data);
+
     return {
       ...localResult,
-      _meta: { usedAPI: false, error: err instanceof Error ? err.message : "Unknown error" },
+      _meta: { usedAPI: false, error: error.message },
     };
   }
 }
+
 
 /**
  * Cycle prediction via real ML API with local fallback
  */
 export async function predictCycleFromAPI(
-  data: CycleData
+  data: CycleData,
+  userId?: string
 ): Promise<CyclePrediction & { _meta: MLPredictionMeta }> {
-  try {
-    const serializedData = {
-      ...data,
-      lastPeriodStart: data.lastPeriodStart.toISOString(),
-    };
 
-    const { data: response, error } = await supabase.functions.invoke("ml-predict", {
-      body: { model_type: "cycle", input_data: serializedData },
+  try {
+    const response = await fetch(`${API_BASE_URL}/predict/cycle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        lastPeriodStart: data.lastPeriodStart.toISOString(),
+      }),
     });
 
-    if (error) throw error;
+    if (!response.ok) throw new Error("Backend error");
 
-    if (response?.fallback === false && response?.prediction) {
-      const p = response.prediction;
-      const result: CyclePrediction = {
-        predictedStartDate: new Date(p.predicted_start_date ?? p.predictedStartDate),
-        confidenceLevel: p.confidence_level ?? p.confidenceLevel ?? 'low',
-        averageCycleLength: p.average_cycle_length ?? p.averageCycleLength ?? 28,
-        cycleVariability: p.cycle_variability ?? p.cycleVariability ?? 0,
-        isIrregular: p.is_irregular ?? p.isIrregular ?? false,
-        pcosRiskFlag: p.pcos_risk_flag ?? p.pcosRiskFlag ?? false,
-        delayAdjustment: p.delay_adjustment ?? p.delayAdjustment ?? 0,
-      };
+    const result = await response.json();
 
-      return { ...result, _meta: { usedAPI: true } };
+    const formatted: CyclePrediction = {
+      predictedStartDate: new Date(result.predictedStartDate),
+      confidenceLevel: result.confidenceLevel,
+      averageCycleLength: result.averageCycleLength,
+      cycleVariability: result.cycleVariability,
+      isIrregular: result.isIrregular,
+      pcosRiskFlag: result.pcosRiskFlag,
+      delayAdjustment: result.delayAdjustment,
+    };
+
+    if (userId) {
+      await supabase.from("cycle_predictions").insert([
+        {
+          user_id: userId,
+          predicted_start_date:
+            formatted.predictedStartDate.toISOString().split("T")[0],
+          confidence_level: formatted.confidenceLevel,
+          created_at: new Date().toISOString(),
+        },
+      ]);
     }
 
-    console.log("ML API fallback:", response?.error);
+    return { ...formatted, _meta: { usedAPI: true } };
+
+  } catch (error: any) {
+
     const localResult = predictNextCycle(data);
-    return { ...localResult, _meta: { usedAPI: false, error: response?.error } };
-  } catch (err) {
-    console.error("ML API call failed, using local prediction:", err);
-    const localResult = predictNextCycle(data);
+
     return {
       ...localResult,
-      _meta: { usedAPI: false, error: err instanceof Error ? err.message : "Unknown error" },
+      _meta: { usedAPI: false, error: error.message },
     };
   }
 }
+
+
 
 // Public wrappers for recommendation functions (used by API result mapping)
 function getPCOSRecommendationsPublic(severity: 'none' | 'low' | 'medium' | 'high'): PCOSRecommendations {

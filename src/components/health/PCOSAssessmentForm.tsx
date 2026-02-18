@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { PCOSInputData } from "@/lib/ml-predictions";
 
+
 interface PCOSAssessmentFormProps {
   onSubmit: (data: PCOSInputData) => void;
 }
+
 
 type FormStep = 'personal' | 'symptoms' | 'lifestyle' | 'clinical';
 
@@ -62,11 +64,16 @@ export const PCOSAssessmentForm = ({ onSubmit }: PCOSAssessmentFormProps) => {
     }
   };
 
-  const handleSubmit = () => {
-    // Calculate BMI from weight if not accurate
-    const bmi = formData.bmi || (formData.weight / 2.5); // Approximate
-    onSubmit({ ...formData, bmi });
-  };
+ const handleSubmit = () => {
+  const bmi = formData.bmi || (formData.weight / 2.5);
+
+  onSubmit({
+    ...formData,
+    bmi,
+  });
+};
+
+
 
   const stepIcons = {
     personal: User,

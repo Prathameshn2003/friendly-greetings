@@ -66,7 +66,8 @@ const MenopauseModule = () => {
         try {
           const { error } = await supabase.from("health_assessments").insert({
             user_id: user.id,
-            assessment_type: _meta.usedAPI ? "menopause_ml_api" : "menopause_ml_local",
+            assessment_type: "menopause",
+
             risk_score: result.riskPercentage,
             risk_category: result.stage === 'Pre-Menopause' ? 'low' : result.stage === 'Peri-Menopause' ? 'medium' : 'high',
             responses: data as any,

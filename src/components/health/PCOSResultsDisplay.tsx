@@ -26,7 +26,25 @@ interface PCOSResultsDisplayProps {
 }
 
 export const PCOSResultsDisplay = ({ result, onFindDoctors, onRestart }: PCOSResultsDisplayProps) => {
-  const { hasPCOS, riskPercentage, severity, breakdown, recommendations } = result;
+const {
+  hasPCOS,
+  riskPercentage,
+  severity,
+  breakdown = {
+    cycleScore: 0,
+    hormonalScore: 0,
+    ultrasoundScore: 0,
+    metabolicScore: 0
+  },
+  recommendations = {
+    diet: [],
+    exercise: [],
+    lifestyle: [],
+    needsDoctor: false
+  }
+} = result;
+
+
 
   const severityConfig = {
     none: { label: 'No PCOS Detected', color: 'text-teal', bgColor: 'bg-teal/20', description: 'Your symptoms do not indicate PCOS risk. Maintain a healthy lifestyle!' },

@@ -1,3 +1,7 @@
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
+
+
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -20,8 +24,47 @@ const dashboardSections = [
 
 const Dashboard = () => {
   const { user } = useAuth();
+
+ useEffect(() => {
+  const fetchAssessments = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("health_assessments")
+      .select("assessment_type, risk_score, risk_category, created_at")
+      .eq("user_id", user.id)
+      .in("assessment_type", ["pcos", "menopause"])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    if (!data) return;
+
+    const latestPCOS = data.find(a => a.assessment_type === "pcos");
+    const latestMenopause = data.find(a => a.assessment_type === "menopause");
+
+    if (latestPCOS) setPcosAssessment(latestPCOS);
+    if (latestMenopause) setMenopauseAssessment(latestMenopause);
+  };
+
+  fetchAssessments();
+}, [user]);
+
+
+
   const { cycleLogs, loading, prediction, insights } = useCycleTracking();
   const userName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
+  const [pcosAssessment, setPcosAssessment] = useState<any>(null);
+  const [pcosHistory, setPcosHistory] = useState<any[]>([]);
+  
+
+  const [menopauseAssessment, setMenopauseAssessment] = useState<any>(null);
+  
+
+
 
   // Get time-based greeting
   const greeting = useMemo(() => {
@@ -107,28 +150,58 @@ const Dashboard = () => {
       metric: cycleLogs.length > 0 ? `${insights.averageCycleLength} days` : "N/A",
       metricLabel: "Average Cycle",
     },
+   {
+  title: "PCOS Risk",
+  status: pcosAssessment
+    ? pcosAssessment.risk_category.toUpperCase()
+    : "Not Assessed",
+
+  statusColor: pcosAssessment
+    ? pcosAssessment.risk_category === "high"
+      ? "text-destructive"
+      : pcosAssessment.risk_category === "medium"
+      ? "text-accent"
+      : "text-success"
+    : "text-muted-foreground",
+
+  icon: Activity,
+  iconBg: "bg-accent/15",
+  iconColor: "text-accent",
+  path: "/modules/pcos",
+
+  metric: pcosAssessment
+    ? `${pcosAssessment.risk_score}%`
+    : "N/A",
+
+  metricLabel: "Health Score",
+},
+
     {
-      title: "PCOS Risk",
-      status: insights.pcosRiskFlag ? "Pattern Detected" : cycleLogs.length >= 3 ? "Low Risk" : "Not Assessed",
-      statusColor: insights.pcosRiskFlag ? "text-accent" : cycleLogs.length >= 3 ? "text-success" : "text-muted-foreground",
-      icon: Activity,
-      iconBg: "bg-accent/15",
-      iconColor: "text-accent",
-      path: "/modules/pcos",
-      metric: cycleLogs.length >= 3 ? `${Math.round(100 - insights.pcosRiskScore)}%` : "N/A",
-      metricLabel: "Health Score",
-    },
-    {
-      title: "Menopause Stage",
-      status: "Not Applicable",
-      statusColor: "text-muted-foreground",
-      icon: Thermometer,
-      iconBg: "bg-primary/15",
-      iconColor: "text-primary",
-      path: "/modules/menopause",
-      metric: "N/A",
-      metricLabel: "Current Stage",
-    },
+  title: "Menopause Stage",
+  status: menopauseAssessment
+    ? menopauseAssessment.risk_category.toUpperCase()
+    : "Not Assessed",
+
+  statusColor: menopauseAssessment
+    ? menopauseAssessment.risk_category === "high"
+      ? "text-primary"
+      : menopauseAssessment.risk_category === "medium"
+      ? "text-accent"
+      : "text-teal"
+    : "text-muted-foreground",
+
+  icon: Thermometer,
+  iconBg: "bg-primary/15",
+  iconColor: "text-primary",
+  path: "/modules/menopause",
+
+  metric: menopauseAssessment
+    ? `${menopauseAssessment.risk_score}%`
+    : "N/A",
+
+  metricLabel: "Current Stage",
+}
+
   ], [cycleData, cycleLogs, insights]);
 
   if (loading) {
@@ -217,6 +290,7 @@ const Dashboard = () => {
                 <p className={`text-sm font-medium ${card.statusColor} mb-3`}>{card.status}</p>
                 <div className="pt-3 border-t border-border">
                   <div className="text-xl font-bold gradient-text">{card.metric}</div>
+                  
                   <div className="text-xs text-muted-foreground mt-0.5">{card.metricLabel}</div>
                 </div>
               </Link>

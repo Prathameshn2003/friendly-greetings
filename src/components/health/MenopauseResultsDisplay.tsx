@@ -26,7 +26,19 @@ interface MenopauseResultsDisplayProps {
 }
 
 export const MenopauseResultsDisplay = ({ result, onFindDoctors, onRestart }: MenopauseResultsDisplayProps) => {
-  const { stage, riskPercentage, hasMenopauseSymptoms, breakdown, recommendations } = result;
+  const {
+  stage,
+  riskPercentage,
+  hasMenopauseSymptoms,
+  breakdown,
+  recommendations = {
+    diet: [],
+    exercise: [],
+    lifestyle: [],
+    needsDoctor: false
+  }
+} = result;
+
 
   const stageConfig = {
     'Pre-Menopause': { 
