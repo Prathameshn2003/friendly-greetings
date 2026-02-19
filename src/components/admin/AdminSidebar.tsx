@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "Doctors", url: "/admin/doctors", icon: Stethoscope },
   { title: "Resources", url: "/admin/resources", icon: BookOpen },
   { title: "Schemes", url: "/admin/schemes", icon: FileText },
-  { title: "Add Doctor", url: "/admin/add-doctor", icon: Stethoscope }, // ✅ Updated icon
 ];
 
 export const AdminSidebar = () => {
