@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react";
+import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -8,22 +8,18 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean;
 }
 
-export const ProtectedRoute = memo(({ children, requireAdmin = false }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const { user, loading, isAdmin } = useAuth();
   const location = useLocation();
 
-  // Prevent back navigation to protected routes after logout
+  // Prevent back navigation after logout
   useEffect(() => {
-    const handlePopState = () => {
-      if (!user && location.pathname !== '/login' && location.pathname !== '/signup') {
-        window.history.replaceState(null, '', '/login');
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    if (!user && location.pathname !== "/login" && location.pathname !== "/signup") {
+      window.history.replaceState(null, "", "/login");
+    }
   }, [user, location.pathname]);
 
+  // Show loader while checking auth
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -35,16 +31,16 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: Protecte
     );
   }
 
+  // Not logged in
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" replace />;
   }
 
-  // Block non-admin users from admin routes
-  if (requireAdmin && !isAdmin) {
+  // Admin route protection
+  if (requireAdmin === true && isAdmin !== true) {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Render protected content
   return <>{children}</>;
-});
-
-ProtectedRoute.displayName = 'ProtectedRoute';
+};

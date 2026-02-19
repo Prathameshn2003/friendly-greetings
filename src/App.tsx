@@ -32,10 +32,12 @@ const Education = lazy(() => import("./pages/Education"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Contact = lazy(() => import("./pages/Contact"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin pages - lazy loaded
 const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminDoctorsPage = lazy(() => import("./pages/admin/AdminDoctorsPage"));
 const AdminResourcesPage = lazy(() => import("./pages/admin/AdminResourcesPage"));
 const AdminSchemesPage = lazy(() => import("./pages/admin/AdminSchemesPage"));
 
@@ -104,6 +106,7 @@ const App = () => (
               {/* Admin routes - protected and require admin role */}
               <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
               <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPage /></ProtectedRoute>} />
+              <Route path="/admin/doctors" element={<ProtectedRoute requireAdmin><AdminDoctorsPage /></ProtectedRoute>} />
               <Route path="/admin/resources" element={<ProtectedRoute requireAdmin><AdminResourcesPage /></ProtectedRoute>} />
               <Route path="/admin/schemes" element={<ProtectedRoute requireAdmin><AdminSchemesPage /></ProtectedRoute>} />
               
